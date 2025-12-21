@@ -8,6 +8,9 @@ const session = require('express-session');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for Railway/Render (needed for secure cookies behind HTTPS proxy)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors({ credentials: true }));
 app.use(express.json());
@@ -15,9 +18,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'payroll-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
+  proxy: true,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     httpOnly: true,
+    sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
   }
 }));
