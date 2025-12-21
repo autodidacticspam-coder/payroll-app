@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payroll History</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; text-align: center; }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2196F3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .week-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .week-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+        }
+        .week-meta {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .load-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .load-btn:hover { background: #45a049; }
+        .print-btn {
+            background: #9C27B0;
+            color: white;
+        }
+        .print-btn:hover { background: #7B1FA2; }
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+        .delete-btn:hover { background: #d32f2f; }
+        .time-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        .time-table th, .time-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .time-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+        .time-table .day-col {
+            text-align: left;
+            font-weight: 500;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .summary-value {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+        }
+        .no-weeks {
+            text-align: center;
+            color: #888;
+            padding: 40px;
+            font-style: italic;
+        }
+
+        /* Print Styles */
+        @media print {
+            body { background: white; padding: 0; }
+            .no-print { display: none !important; }
+            .card { box-shadow: none; page-break-inside: avoid; }
+        }
+        .print-sheet { display: none; }
+        .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .print-table th, .print-table td {
+            border: 1px solid #333;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        .print-table th {
+            background: #f0f0f0;
+            font-weight: 600;
+        }
+        .print-table .day-col { text-align: left; font-weight: 600; }
+        .print-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #333;
+        }
+        .print-header h2 { margin: 0 0 5px 0; }
+        .print-header p { margin: 0; color: #555; }
+        .print-summary {
+            margin-top: 20px;
+            padding: 15px;
+            border: 2px solid #333;
+        }
+        .print-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .print-summary-row.total {
+            border-top: 2px solid #333;
+            margin-top: 10px;
+            padding-top: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link no-print">&larr; Back to Calculator</a>
+    <h1>Saved Weeks</h1>
+
+    <div id="weeksList"></div>
+    <div class="print-sheet" id="printSheet"></div>
+
+    <script>
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        function parseTime(timeStr) {
+            if (!timeStr) return null;
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours + minutes / 60;
+        }
+
+        function formatTimeDisplay(timeStr) {
+            if (!timeStr) return '-';
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const h = hours % 12 || 12;
+            return `${h}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+        }
+
+        function getShiftHours(inTime, outTime) {
+            if (inTime === null || outTime === null) return 0;
+            let hours = outTime - inTime;
+            if (hours < 0) hours += 24;
+            return Math.max(0, hours);
+        }
+
+        function calculateWeek(data) {
+            const dailyHours = data.times.map(day => {
+                const in1 = parseTime(day.in1);
+                const out1 = parseTime(day.out1);
+                const in2 = parseTime(day.in2);
+                const out2 = parseTime(day.out2);
+                return getShiftHours(in1, out1) + getShiftHours(in2, out2);
+            });
+
+            const totalHours = dailyHours.reduce((sum, h) => sum + h, 0);
+            const hourlyRate = parseFloat(data.hourlyRate) || 45;
+            const otMultiplier = parseFloat(data.overtimeMultiplier) || 1.5;
+
+            let dailyOvertime = 0;
+            dailyHours.forEach(hours => {
+                if (hours > 9) dailyOvertime += hours - 9;
+            });
+
+            const weeklyOvertime = Math.max(0, totalHours - 40);
+            const overtimeHours = Math.max(dailyOvertime, weeklyOvertime);
+
+            const regularPay = totalHours * hourlyRate;
+            const bonus = Math.ceil(overtimeHours * hourlyRate * (otMultiplier - 1));
+            const totalPay = regularPay + bonus;
+
+            return { dailyHours, totalHours, hourlyRate, otMultiplier, overtimeHours, regularPay, bonus, totalPay };
+        }
+
+        async function loadWeeks() {
+            try {
+                const response = await fetch('/api/weeks');
+                const weeks = await response.json();
+                const container = document.getElementById('weeksList');
+
+                if (weeks.length === 0) {
+                    container.innerHTML = '<div class="card"><div class="no-weeks">No saved weeks yet.</div></div>';
+                    return;
+                }
+
+                container.innerHTML = weeks.map((week) => {
+                    const calc = calculateWeek(week.data);
+                    const savedDate = new Date(week.savedAt).toLocaleDateString();
+
+                    let tableRows = '';
+                    days.forEach((day, i) => {
+                        const t = week.data.times[i] || {};
+                        tableRows += `
+                            <tr>
+                                <td class="day-col">${day}</td>
+                                <td>${formatTimeDisplay(t.in1)}</td>
+                                <td>${formatTimeDisplay(t.out1)}</td>
+                                <td>${formatTimeDisplay(t.in2)}</td>
+                                <td>${formatTimeDisplay(t.out2)}</td>
+                                <td><strong>${calc.dailyHours[i].toFixed(2)}</strong></td>
+                            </tr>
+                        `;
+                    });
+
+                    return `
+                        <div class="card">
+                            <div class="week-header no-print">
+                                <div>
+                                    <div class="week-title">${week.label}</div>
+                                    <div class="week-meta">Saved: ${savedDate}</div>
+                                </div>
+                                <div class="btn-group">
+                                    <button class="load-btn" onclick="loadWeek(${week.id})">Load</button>
+                                    <button class="print-btn" onclick="printWeek(${week.id})">Print</button>
+                                    <button class="delete-btn" onclick="deleteWeek(${week.id})">Delete</button>
+                                </div>
+                            </div>
+                            <table class="time-table">
+                                <thead>
+                                    <tr>
+                                        <th>Day</th>
+                                        <th>In 1</th>
+                                        <th>Out 1</th>
+                                        <th>In 2</th>
+                                        <th>Out 2</th>
+                                        <th>Hours</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRows}
+                                </tbody>
+                            </table>
+                            <div class="summary">
+                                <div class="summary-item">
+                                    <div class="summary-label">Total Hours</div>
+                                    <div class="summary-value">${calc.totalHours.toFixed(2)}</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-label">Hourly Rate</div>
+                                    <div class="summary-value">$${calc.hourlyRate.toFixed(2)}</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-label">Regular Pay</div>
+                                    <div class="summary-value">$${calc.regularPay.toFixed(2)}</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-label">Bonus</div>
+                                    <div class="summary-value">$${calc.bonus}</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-label">Total Pay</div>
+                                    <div class="summary-value">$${calc.totalPay.toFixed(2)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Error loading weeks:', err);
+            }
+        }
+
+        async function loadWeek(id) {
+            try {
+                const response = await fetch('/api/weeks');
+                const weeks = await response.json();
+                const week = weeks.find(w => w.id === id);
+
+                if (week) {
+                    const autoSaveData = {
+                        weekLabel: week.label,
+                        startDate: week.data.startDate,
+                        hourlyRate: week.data.hourlyRate,
+                        overtimeMultiplier: week.data.overtimeMultiplier,
+                        times: week.data.times
+                    };
+
+                    await fetch('/api/autosave', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(autoSaveData)
+                    });
+
+                    window.location.href = '/';
+                }
+            } catch (err) {
+                alert('Error loading week: ' + err.message);
+            }
+        }
+
+        async function deleteWeek(id) {
+            if (!confirm('Delete this saved week?')) return;
+
+            try {
+                await fetch(`/api/weeks/${id}`, { method: 'DELETE' });
+                loadWeeks();
+            } catch (err) {
+                alert('Error deleting week: ' + err.message);
+            }
+        }
+
+        async function printWeek(id) {
+            try {
+                const response = await fetch('/api/weeks');
+                const weeks = await response.json();
+                const week = weeks.find(w => w.id === id);
+
+                if (!week) return;
+
+                const calc = calculateWeek(week.data);
+                const startDate = week.data.startDate ? new Date(week.data.startDate + 'T00:00:00') : null;
+
+                let tableRows = '';
+                days.forEach((day, i) => {
+                    const t = week.data.times[i] || {};
+                    let dateStr = '';
+                    if (startDate) {
+                        const d = new Date(startDate);
+                        d.setDate(startDate.getDate() + i);
+                        dateStr = ' ' + (d.getMonth() + 1) + '/' + d.getDate();
+                    }
+                    tableRows += `
+                        <tr>
+                            <td class="day-col">${day}${dateStr}</td>
+                            <td>${formatTimeDisplay(t.in1)}</td>
+                            <td>${formatTimeDisplay(t.out1)}</td>
+                            <td>${formatTimeDisplay(t.in2)}</td>
+                            <td>${formatTimeDisplay(t.out2)}</td>
+                            <td><strong>${calc.dailyHours[i].toFixed(2)}</strong></td>
+                        </tr>
+                    `;
+                });
+
+                const printContent = `
+                    <div class="print-header">
+                        <h2>Timesheet</h2>
+                        <p>${week.label}</p>
+                    </div>
+
+                    <table class="print-table">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>In 1</th>
+                                <th>Out 1</th>
+                                <th>In 2</th>
+                                <th>Out 2</th>
+                                <th>Hours</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                            <tr>
+                                <td colspan="5" style="text-align: right;"><strong>Total Hours:</strong></td>
+                                <td><strong>${calc.totalHours.toFixed(2)}</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="print-summary">
+                        <div class="print-summary-row">
+                            <span>Hourly Rate:</span>
+                            <span>$${calc.hourlyRate.toFixed(2)}</span>
+                        </div>
+                        <div class="print-summary-row">
+                            <span>Hours:</span>
+                            <span>${calc.totalHours.toFixed(2)}</span>
+                        </div>
+                        <div class="print-summary-row">
+                            <span>Regular Pay:</span>
+                            <span>$${calc.regularPay.toFixed(2)}</span>
+                        </div>
+                        <div class="print-summary-row">
+                            <span>Bonus:</span>
+                            <span>$${calc.bonus}</span>
+                        </div>
+                        <div class="print-summary-row total">
+                            <span>TOTAL:</span>
+                            <span>$${calc.totalPay.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('printSheet').innerHTML = printContent;
+                document.getElementById('printSheet').style.display = 'block';
+                document.getElementById('weeksList').style.display = 'none';
+
+                window.print();
+
+                document.getElementById('printSheet').style.display = 'none';
+                document.getElementById('weeksList').style.display = 'block';
+            } catch (err) {
+                alert('Error printing week: ' + err.message);
+            }
+        }
+
+        loadWeeks();
+    </script>
+</body>
+</html>

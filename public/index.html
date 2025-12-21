@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payroll Calculator</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; text-align: center; }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .day-row {
+            display: grid;
+            grid-template-columns: 130px 1fr 1fr 1fr 1fr 80px;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .day-row:last-child { border-bottom: none; }
+        .day-label { font-weight: 600; color: #555; }
+        .day-date { font-size: 12px; color: #888; font-weight: normal; }
+        .header-row {
+            display: grid;
+            grid-template-columns: 130px 1fr 1fr 1fr 1fr 80px;
+            gap: 8px;
+            padding: 5px 0 10px 0;
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            border-bottom: 2px solid #ddd;
+        }
+        .header-row span:first-child { text-align: left; }
+        input[type="time"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input[type="date"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .daily-hours {
+            text-align: right;
+            color: #666;
+            font-size: 14px;
+        }
+        .settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .settings label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .settings input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .date-picker-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .date-picker-row label { font-weight: 500; white-space: nowrap; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover { background: #45a049; }
+        .results { display: none; }
+        .results.show { display: block; }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .result-label { color: #555; }
+        .result-value { font-weight: 600; }
+        .total-row {
+            font-size: 1.2em;
+            padding-top: 15px;
+            margin-top: 10px;
+            border-top: 2px solid #333;
+        }
+        .overtime-method {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: 500;
+        }
+        .clear-btn { background: #f44336; }
+        .clear-btn:hover { background: #d32f2f; }
+        .save-btn { background: #2196F3; }
+        .save-btn:hover { background: #1976D2; }
+        .print-btn { background: #9C27B0; }
+        .print-btn:hover { background: #7B1FA2; }
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .week-label-input {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .week-label-input input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .history-link {
+            display: block;
+            text-align: center;
+            margin-top: 10px;
+            color: #2196F3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .history-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Print Styles */
+        @media print {
+            body { background: white; padding: 0; max-width: 100%; }
+            .no-print { display: none !important; }
+            .card { box-shadow: none; margin-bottom: 10px; }
+            .print-sheet { display: block !important; }
+            .results { display: none !important; }
+            #timeEntries { display: none; }
+            .date-picker-row { display: none; }
+            .print-sheet {
+                page-break-inside: avoid;
+            }
+        }
+        .print-sheet {
+            display: none;
+        }
+        .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .print-table th, .print-table td {
+            border: 1px solid #333;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        .print-table th {
+            background: #f0f0f0;
+            font-weight: 600;
+        }
+        .print-table .day-col { text-align: left; font-weight: 600; }
+        .print-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #333;
+        }
+        .print-header h2 { margin: 0 0 5px 0; }
+        .print-header p { margin: 0; color: #555; }
+        .print-summary {
+            margin-top: 20px;
+            padding: 15px;
+            border: 2px solid #333;
+        }
+        .print-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .print-summary-row.total {
+            border-top: 2px solid #333;
+            margin-top: 10px;
+            padding-top: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Payroll Calculator</h1>
+
+    <div class="card no-print">
+        <div class="week-label-input">
+            <input type="text" id="weekLabel" placeholder="Week label (e.g., Week of Dec 15, 2024)" oninput="autoSave()">
+            <button class="save-btn" style="width: auto; margin: 0;" onclick="saveWeek()">Save Week</button>
+        </div>
+        <a href="history.html" class="history-link">View Saved Weeks</a>
+    </div>
+
+    <div class="card">
+        <h3>Pay Period (Sunday - Saturday)</h3>
+        <div class="date-picker-row no-print">
+            <label for="startDate">Pay Period Start (Sunday):</label>
+            <input type="date" id="startDate" onchange="updateDates(); autoSave();">
+        </div>
+        <div id="timeEntries"></div>
+        <div class="print-sheet" id="printSheet"></div>
+    </div>
+
+    <div class="card no-print">
+        <h3>Pay Rate</h3>
+        <div class="settings">
+            <div>
+                <label for="hourlyRate">Hourly Rate ($)</label>
+                <input type="number" id="hourlyRate" value="45" step="0.01" min="0" onchange="autoSave()">
+            </div>
+            <div>
+                <label for="overtimeMultiplier">Overtime Multiplier</label>
+                <input type="number" id="overtimeMultiplier" value="1.5" step="0.1" min="1" onchange="autoSave()">
+            </div>
+        </div>
+        <button onclick="calculate()">Calculate Pay</button>
+        <div class="btn-row">
+            <button class="print-btn" onclick="printSheet()">Print Timesheet</button>
+            <button class="clear-btn" onclick="clearAll()">Clear All</button>
+        </div>
+    </div>
+
+    <div class="card results no-print" id="results">
+        <h3>Results</h3>
+        <div class="overtime-method" id="overtimeMethod"></div>
+        <div id="resultDetails"></div>
+    </div>
+
+    <script>
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        let weekDates = [];
+        let saveTimeout = null;
+
+        function init() {
+            const container = document.getElementById('timeEntries');
+
+            const header = document.createElement('div');
+            header.className = 'header-row';
+            header.innerHTML = `
+                <span></span>
+                <span>In 1</span>
+                <span>Out 1</span>
+                <span>In 2</span>
+                <span>Out 2</span>
+                <span>Total</span>
+            `;
+            container.appendChild(header);
+
+            days.forEach((day, index) => {
+                const row = document.createElement('div');
+                row.className = 'day-row';
+                const defaultIn1 = index > 0 ? '06:00' : '';
+                row.innerHTML = `
+                    <span class="day-label">${day}<br><span class="day-date" id="date_${index}"></span></span>
+                    <input type="time" id="in1_${index}" value="${defaultIn1}" onchange="updateDailyHours(${index})">
+                    <input type="time" id="out1_${index}" onchange="updateDailyHours(${index})">
+                    <input type="time" id="in2_${index}" onchange="updateDailyHours(${index})">
+                    <input type="time" id="out2_${index}" onchange="updateDailyHours(${index})">
+                    <span class="daily-hours" id="hours_${index}">0.00 hrs</span>
+                `;
+                container.appendChild(row);
+            });
+
+            loadAutoSave();
+        }
+
+        function updateDates() {
+            const startDateStr = document.getElementById('startDate').value;
+            if (!startDateStr) {
+                weekDates = [];
+                days.forEach((_, i) => {
+                    document.getElementById(`date_${i}`).textContent = '';
+                });
+                return;
+            }
+
+            const startDate = new Date(startDateStr + 'T00:00:00');
+            weekDates = [];
+
+            days.forEach((_, i) => {
+                const date = new Date(startDate);
+                date.setDate(startDate.getDate() + i);
+                weekDates.push(date);
+                const formatted = (date.getMonth() + 1) + '/' + date.getDate() + '/' + date.getFullYear();
+                document.getElementById(`date_${i}`).textContent = formatted;
+            });
+        }
+
+        function parseTime(timeStr) {
+            if (!timeStr) return null;
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours + minutes / 60;
+        }
+
+        function formatTimeDisplay(timeStr) {
+            if (!timeStr) return '-';
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const h = hours % 12 || 12;
+            return `${h}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+        }
+
+        function formatDateDisplay(date) {
+            if (!date) return '';
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            return `${month}/${day}`;
+        }
+
+        function getShiftHours(inTime, outTime) {
+            if (inTime === null || outTime === null) return 0;
+            let hours = outTime - inTime;
+            if (hours < 0) hours += 24;
+            return Math.max(0, hours);
+        }
+
+        function getDailyHours(index) {
+            const in1 = parseTime(document.getElementById(`in1_${index}`).value);
+            const out1 = parseTime(document.getElementById(`out1_${index}`).value);
+            const in2 = parseTime(document.getElementById(`in2_${index}`).value);
+            const out2 = parseTime(document.getElementById(`out2_${index}`).value);
+
+            return getShiftHours(in1, out1) + getShiftHours(in2, out2);
+        }
+
+        function updateDailyHours(index) {
+            const hours = getDailyHours(index);
+            document.getElementById(`hours_${index}`).textContent = hours.toFixed(2) + ' hrs';
+            autoSave();
+        }
+
+        function autoSave() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const data = getWeekData();
+                data.weekLabel = document.getElementById('weekLabel').value;
+
+                fetch('/api/autosave', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).catch(err => console.log('Autosave error:', err));
+            }, 500);
+        }
+
+        async function loadAutoSave() {
+            try {
+                const response = await fetch('/api/autosave');
+                const data = await response.json();
+
+                if (data && data.times) {
+                    data.times.forEach((day, i) => {
+                        document.getElementById(`in1_${i}`).value = day.in1 || (i > 0 ? '06:00' : '');
+                        document.getElementById(`out1_${i}`).value = day.out1 || '';
+                        document.getElementById(`in2_${i}`).value = day.in2 || '';
+                        document.getElementById(`out2_${i}`).value = day.out2 || '';
+                        updateDailyHoursNoSave(i);
+                    });
+                    document.getElementById('startDate').value = data.startDate || '';
+                    document.getElementById('hourlyRate').value = data.hourlyRate || 45;
+                    document.getElementById('overtimeMultiplier').value = data.overtimeMultiplier || 1.5;
+                    document.getElementById('weekLabel').value = data.weekLabel || '';
+                    updateDates();
+                }
+            } catch (err) {
+                console.log('Load autosave error:', err);
+            }
+        }
+
+        function updateDailyHoursNoSave(index) {
+            const hours = getDailyHours(index);
+            document.getElementById(`hours_${index}`).textContent = hours.toFixed(2) + ' hrs';
+        }
+
+        function getWeekData() {
+            const times = [];
+            days.forEach((_, i) => {
+                times.push({
+                    in1: document.getElementById(`in1_${i}`).value,
+                    out1: document.getElementById(`out1_${i}`).value,
+                    in2: document.getElementById(`in2_${i}`).value,
+                    out2: document.getElementById(`out2_${i}`).value
+                });
+            });
+            return {
+                times,
+                startDate: document.getElementById('startDate').value,
+                hourlyRate: document.getElementById('hourlyRate').value,
+                overtimeMultiplier: document.getElementById('overtimeMultiplier').value
+            };
+        }
+
+        async function saveWeek() {
+            const label = document.getElementById('weekLabel').value.trim();
+            if (!label) {
+                alert('Please enter a label for this week.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/weeks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        label,
+                        data: getWeekData()
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Week saved!');
+                } else {
+                    alert('Error saving week');
+                }
+            } catch (err) {
+                alert('Error saving week: ' + err.message);
+            }
+        }
+
+        function calculate() {
+            const hourlyRate = parseFloat(document.getElementById('hourlyRate').value) || 0;
+            const otMultiplier = parseFloat(document.getElementById('overtimeMultiplier').value) || 1.5;
+
+            const dailyHours = days.map((_, i) => getDailyHours(i));
+            const totalHours = dailyHours.reduce((sum, h) => sum + h, 0);
+
+            let dailyRegular = 0;
+            let dailyOvertime = 0;
+            dailyHours.forEach(hours => {
+                if (hours > 9) {
+                    dailyRegular += 9;
+                    dailyOvertime += hours - 9;
+                } else {
+                    dailyRegular += hours;
+                }
+            });
+
+            let weeklyRegular = Math.min(totalHours, 40);
+            let weeklyOvertime = Math.max(0, totalHours - 40);
+
+            const useDailyMethod = dailyOvertime > weeklyOvertime;
+            const regularHours = useDailyMethod ? dailyRegular : weeklyRegular;
+            const overtimeHours = useDailyMethod ? dailyOvertime : weeklyOvertime;
+
+            const regularPay = regularHours * hourlyRate;
+            const overtimePay = overtimeHours * hourlyRate * otMultiplier;
+            const totalPay = regularPay + overtimePay;
+
+            const methodText = useDailyMethod
+                ? `Using DAILY overtime method (${dailyOvertime.toFixed(2)} OT hrs vs ${weeklyOvertime.toFixed(2)} weekly)`
+                : `Using WEEKLY overtime method (${weeklyOvertime.toFixed(2)} OT hrs vs ${dailyOvertime.toFixed(2)} daily)`;
+
+            document.getElementById('overtimeMethod').textContent = methodText;
+
+            document.getElementById('resultDetails').innerHTML = `
+                <div class="result-row">
+                    <span class="result-label">Total Hours Worked</span>
+                    <span class="result-value">${totalHours.toFixed(2)} hrs</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Regular Hours</span>
+                    <span class="result-value">${regularHours.toFixed(2)} hrs</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Overtime Hours (${otMultiplier}x)</span>
+                    <span class="result-value">${overtimeHours.toFixed(2)} hrs</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Regular Pay ($${hourlyRate.toFixed(2)}/hr)</span>
+                    <span class="result-value">$${regularPay.toFixed(2)}</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">Bonus (Overtime Pay)</span>
+                    <span class="result-value">$${overtimePay.toFixed(2)}</span>
+                </div>
+                <div class="result-row total-row">
+                    <span class="result-label">TOTAL PAY</span>
+                    <span class="result-value">$${totalPay.toFixed(2)}</span>
+                </div>
+            `;
+
+            document.getElementById('results').classList.add('show');
+        }
+
+        function printSheet() {
+            const hourlyRate = parseFloat(document.getElementById('hourlyRate').value) || 0;
+            const otMultiplier = parseFloat(document.getElementById('overtimeMultiplier').value) || 1.5;
+            const weekLabel = document.getElementById('weekLabel').value || 'Pay Period';
+
+            const dailyHours = days.map((_, i) => getDailyHours(i));
+            const totalHours = dailyHours.reduce((sum, h) => sum + h, 0);
+
+            let dailyRegular = 0, dailyOvertime = 0;
+            dailyHours.forEach(hours => {
+                if (hours > 9) {
+                    dailyRegular += 9;
+                    dailyOvertime += hours - 9;
+                } else {
+                    dailyRegular += hours;
+                }
+            });
+
+            let weeklyRegular = Math.min(totalHours, 40);
+            let weeklyOvertime = Math.max(0, totalHours - 40);
+
+            const useDailyMethod = dailyOvertime > weeklyOvertime;
+            const overtimeHours = useDailyMethod ? dailyOvertime : weeklyOvertime;
+
+            const regularPay = totalHours * hourlyRate;
+            const bonus = Math.ceil(overtimeHours * hourlyRate * (otMultiplier - 1));
+            const totalPay = regularPay + bonus;
+
+            let tableRows = '';
+            days.forEach((day, i) => {
+                const in1 = document.getElementById(`in1_${i}`).value;
+                const out1 = document.getElementById(`out1_${i}`).value;
+                const in2 = document.getElementById(`in2_${i}`).value;
+                const out2 = document.getElementById(`out2_${i}`).value;
+                const hours = getDailyHours(i);
+                const dateStr = weekDates[i] ? formatDateDisplay(weekDates[i]) : '';
+
+                tableRows += `
+                    <tr>
+                        <td class="day-col">${day}${dateStr ? ' ' + dateStr : ''}</td>
+                        <td>${formatTimeDisplay(in1)}</td>
+                        <td>${formatTimeDisplay(out1)}</td>
+                        <td>${formatTimeDisplay(in2)}</td>
+                        <td>${formatTimeDisplay(out2)}</td>
+                        <td><strong>${hours.toFixed(2)}</strong></td>
+                    </tr>
+                `;
+            });
+
+            const printContent = `
+                <div class="print-header">
+                    <h2>Timesheet</h2>
+                    <p>${weekLabel}</p>
+                </div>
+
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th>Day</th>
+                            <th>In 1</th>
+                            <th>Out 1</th>
+                            <th>In 2</th>
+                            <th>Out 2</th>
+                            <th>Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                        <tr>
+                            <td colspan="5" style="text-align: right;"><strong>Total Hours:</strong></td>
+                            <td><strong>${totalHours.toFixed(2)}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="print-summary">
+                    <div class="print-summary-row">
+                        <span>Hourly Rate:</span>
+                        <span>$${hourlyRate.toFixed(2)}</span>
+                    </div>
+                    <div class="print-summary-row">
+                        <span>Hours:</span>
+                        <span>${totalHours.toFixed(2)}</span>
+                    </div>
+                    <div class="print-summary-row">
+                        <span>Regular Pay:</span>
+                        <span>$${regularPay.toFixed(2)}</span>
+                    </div>
+                    <div class="print-summary-row">
+                        <span>Bonus:</span>
+                        <span>$${bonus}</span>
+                    </div>
+                    <div class="print-summary-row total">
+                        <span>TOTAL:</span>
+                        <span>$${totalPay.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('printSheet').innerHTML = printContent;
+            window.print();
+        }
+
+        async function clearAll() {
+            days.forEach((_, i) => {
+                document.getElementById(`in1_${i}`).value = i > 0 ? '06:00' : '';
+                document.getElementById(`out1_${i}`).value = '';
+                document.getElementById(`in2_${i}`).value = '';
+                document.getElementById(`out2_${i}`).value = '';
+                document.getElementById(`hours_${i}`).textContent = '0.00 hrs';
+                document.getElementById(`date_${i}`).textContent = '';
+            });
+            document.getElementById('weekLabel').value = '';
+            document.getElementById('startDate').value = '';
+            document.getElementById('results').classList.remove('show');
+            weekDates = [];
+
+            try {
+                await fetch('/api/autosave', { method: 'DELETE' });
+            } catch (err) {
+                console.log('Clear autosave error:', err);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
