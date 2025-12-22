@@ -26,8 +26,9 @@ app.use(session({
   }
 }));
 
-// Database setup
-const db = new Database('payroll.db');
+// Database setup - use /data for Railway volume, otherwise current directory
+const dbPath = process.env.DATABASE_PATH || 'payroll.db';
+const db = new Database(dbPath);
 
 // Create tables
 db.exec(`
