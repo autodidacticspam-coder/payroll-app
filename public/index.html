@@ -343,6 +343,23 @@
                 const formatted = (date.getMonth() + 1) + '/' + date.getDate() + '/' + date.getFullYear();
                 document.getElementById(`date_${i}`).textContent = formatted;
             });
+
+            // Auto-populate week label with date range
+            const endDate = weekDates[6];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const startMonth = months[startDate.getMonth()];
+            const endMonth = months[endDate.getMonth()];
+            const startDay = startDate.getDate();
+            const endDay = endDate.getDate();
+            const year = endDate.getFullYear();
+
+            let label;
+            if (startMonth === endMonth) {
+                label = `${startMonth} ${startDay} - ${endDay}, ${year}`;
+            } else {
+                label = `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+            }
+            document.getElementById('weekLabel').value = label;
         }
 
         function parseTime(timeStr) {
