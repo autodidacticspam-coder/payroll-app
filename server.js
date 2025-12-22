@@ -14,13 +14,12 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(cors({ credentials: true }));
 app.use(express.json());
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'payroll-secret-key-change-in-production',
+  secret: process.env.SESSION_SECRET || 'payroll-secret-key-2024',
   resave: false,
   saveUninitialized: false,
-  proxy: true,
   cookie: {
-    secure: true,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
