@@ -88,6 +88,9 @@
             grid-template-columns: 1fr 1fr;
             gap: 15px;
         }
+        .settings-3col {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
         .settings label { display: block; margin-bottom: 5px; font-weight: 500; }
         .settings input {
             width: 100%;
@@ -261,7 +264,7 @@
 
     <div class="card no-print">
         <h3>Pay Rate</h3>
-        <div class="settings">
+        <div class="settings settings-3col">
             <div>
                 <label for="hourlyRate">Hourly Rate ($)</label>
                 <input type="number" id="hourlyRate" value="45" step="0.01" min="0" onchange="autoSave()">
@@ -269,6 +272,10 @@
             <div>
                 <label for="overtimeMultiplier">Overtime Multiplier</label>
                 <input type="number" id="overtimeMultiplier" value="1.5" step="0.1" min="1" onchange="autoSave()">
+            </div>
+            <div>
+                <label for="holidayHours">Holiday Hours</label>
+                <input type="number" id="holidayHours" value="0" step="0.5" min="0" onchange="autoSave()">
             </div>
         </div>
         <button onclick="calculate()">Calculate Pay</button>
@@ -454,6 +461,7 @@
                     document.getElementById('startDate').value = data.startDate || '';
                     document.getElementById('hourlyRate').value = data.hourlyRate || 45;
                     document.getElementById('overtimeMultiplier').value = data.overtimeMultiplier || 1.5;
+                    document.getElementById('holidayHours').value = data.holidayHours || 0;
                     document.getElementById('weekLabel').value = data.weekLabel || '';
                     updateDates();
                 }
@@ -481,7 +489,8 @@
                 times,
                 startDate: document.getElementById('startDate').value,
                 hourlyRate: document.getElementById('hourlyRate').value,
-                overtimeMultiplier: document.getElementById('overtimeMultiplier').value
+                overtimeMultiplier: document.getElementById('overtimeMultiplier').value,
+                holidayHours: document.getElementById('holidayHours').value
             };
         }
 
@@ -515,10 +524,12 @@
         function calculate() {
             const hourlyRate = parseFloat(document.getElementById('hourlyRate').value) || 0;
             const otMultiplier = parseFloat(document.getElementById('overtimeMultiplier').value) || 1.5;
+            const holidayHours = parseFloat(document.getElementById('holidayHours').value) || 0;
 
             const dailyHours = days.map((_, i) => getDailyHours(i));
-            const totalHours = dailyHours.reduce((sum, h) => sum + h, 0);
+            const workedHours = dailyHours.reduce((sum, h) => sum + h, 0);
 
+            // Calculate overtime based ONLY on worked hours (not holiday)
             let dailyRegular = 0;
             let dailyOvertime = 0;
             dailyHours.forEach(hours => {
@@ -530,16 +541,19 @@
                 }
             });
 
-            let weeklyRegular = Math.min(totalHours, 40);
-            let weeklyOvertime = Math.max(0, totalHours - 40);
+            let weeklyRegular = Math.min(workedHours, 40);
+            let weeklyOvertime = Math.max(0, workedHours - 40);
 
             const useDailyMethod = dailyOvertime > weeklyOvertime;
             const regularHours = useDailyMethod ? dailyRegular : weeklyRegular;
             const overtimeHours = useDailyMethod ? dailyOvertime : weeklyOvertime;
 
+            // Calculate pay
             const regularPay = regularHours * hourlyRate;
             const overtimePay = overtimeHours * hourlyRate * otMultiplier;
-            const totalPay = regularPay + overtimePay;
+            const holidayPay = holidayHours * hourlyRate;
+            const totalPay = regularPay + overtimePay + holidayPay;
+            const totalHours = workedHours + holidayHours;
 
             const methodText = useDailyMethod
                 ? `Using DAILY overtime method (${dailyOvertime.toFixed(2)} OT hrs vs ${weeklyOvertime.toFixed(2)} weekly)`
@@ -547,11 +561,25 @@
 
             document.getElementById('overtimeMethod').textContent = methodText;
 
-            document.getElementById('resultDetails').innerHTML = `
+            let resultsHtml = `
                 <div class="result-row">
-                    <span class="result-label">Total Hours Worked</span>
-                    <span class="result-value">${totalHours.toFixed(2)} hrs</span>
+                    <span class="result-label">Hours Worked</span>
+                    <span class="result-value">${workedHours.toFixed(2)} hrs</span>
+                </div>`;
+
+            if (holidayHours > 0) {
+                resultsHtml += `
+                <div class="result-row">
+                    <span class="result-label">Holiday Hours</span>
+                    <span class="result-value">${holidayHours.toFixed(2)} hrs</span>
                 </div>
+                <div class="result-row">
+                    <span class="result-label">Total Hours</span>
+                    <span class="result-value">${totalHours.toFixed(2)} hrs</span>
+                </div>`;
+            }
+
+            resultsHtml += `
                 <div class="result-row">
                     <span class="result-label">Regular Hours</span>
                     <span class="result-value">${regularHours.toFixed(2)} hrs</span>
@@ -567,23 +595,35 @@
                 <div class="result-row">
                     <span class="result-label">Bonus (Overtime Pay)</span>
                     <span class="result-value">$${overtimePay.toFixed(2)}</span>
-                </div>
+                </div>`;
+
+            if (holidayHours > 0) {
+                resultsHtml += `
+                <div class="result-row">
+                    <span class="result-label">Holiday Pay ($${hourlyRate.toFixed(2)}/hr)</span>
+                    <span class="result-value">$${holidayPay.toFixed(2)}</span>
+                </div>`;
+            }
+
+            resultsHtml += `
                 <div class="result-row total-row">
                     <span class="result-label">TOTAL PAY</span>
                     <span class="result-value">$${totalPay.toFixed(2)}</span>
                 </div>
             `;
 
+            document.getElementById('resultDetails').innerHTML = resultsHtml;
             document.getElementById('results').classList.add('show');
         }
 
         function printSheet() {
             const hourlyRate = parseFloat(document.getElementById('hourlyRate').value) || 0;
             const otMultiplier = parseFloat(document.getElementById('overtimeMultiplier').value) || 1.5;
+            const holidayHours = parseFloat(document.getElementById('holidayHours').value) || 0;
             const weekLabel = document.getElementById('weekLabel').value || 'Pay Period';
 
             const dailyHours = days.map((_, i) => getDailyHours(i));
-            const totalHours = dailyHours.reduce((sum, h) => sum + h, 0);
+            const workedHours = dailyHours.reduce((sum, h) => sum + h, 0);
 
             let dailyRegular = 0, dailyOvertime = 0;
             dailyHours.forEach(hours => {
@@ -595,15 +635,17 @@
                 }
             });
 
-            let weeklyRegular = Math.min(totalHours, 40);
-            let weeklyOvertime = Math.max(0, totalHours - 40);
+            let weeklyRegular = Math.min(workedHours, 40);
+            let weeklyOvertime = Math.max(0, workedHours - 40);
 
             const useDailyMethod = dailyOvertime > weeklyOvertime;
             const overtimeHours = useDailyMethod ? dailyOvertime : weeklyOvertime;
 
-            const regularPay = totalHours * hourlyRate;
+            const regularPay = workedHours * hourlyRate;
             const bonus = Math.ceil(overtimeHours * hourlyRate * (otMultiplier - 1));
-            const totalPay = regularPay + bonus;
+            const holidayPay = holidayHours * hourlyRate;
+            const totalPay = regularPay + bonus + holidayPay;
+            const totalHours = workedHours + holidayHours;
 
             let tableRows = '';
             days.forEach((day, i) => {
@@ -626,6 +668,24 @@
                 `;
             });
 
+            let holidayRow = '';
+            if (holidayHours > 0) {
+                holidayRow = `
+                        <tr>
+                            <td colspan="5" style="text-align: right;"><strong>Holiday Hours:</strong></td>
+                            <td><strong>${holidayHours.toFixed(2)}</strong></td>
+                        </tr>`;
+            }
+
+            let holidaySummaryRow = '';
+            if (holidayHours > 0) {
+                holidaySummaryRow = `
+                    <div class="print-summary-row">
+                        <span>Holiday Pay:</span>
+                        <span>$${holidayPay.toFixed(2)}</span>
+                    </div>`;
+            }
+
             const printContent = `
                 <div class="print-header">
                     <h2>Timesheet</h2>
@@ -646,6 +706,10 @@
                     <tbody>
                         ${tableRows}
                         <tr>
+                            <td colspan="5" style="text-align: right;"><strong>Hours Worked:</strong></td>
+                            <td><strong>${workedHours.toFixed(2)}</strong></td>
+                        </tr>${holidayRow}
+                        <tr>
                             <td colspan="5" style="text-align: right;"><strong>Total Hours:</strong></td>
                             <td><strong>${totalHours.toFixed(2)}</strong></td>
                         </tr>
@@ -658,8 +722,8 @@
                         <span>$${hourlyRate.toFixed(2)}</span>
                     </div>
                     <div class="print-summary-row">
-                        <span>Hours:</span>
-                        <span>${totalHours.toFixed(2)}</span>
+                        <span>Hours Worked:</span>
+                        <span>${workedHours.toFixed(2)}</span>
                     </div>
                     <div class="print-summary-row">
                         <span>Regular Pay:</span>
@@ -668,7 +732,7 @@
                     <div class="print-summary-row">
                         <span>Bonus:</span>
                         <span>$${bonus}</span>
-                    </div>
+                    </div>${holidaySummaryRow}
                     <div class="print-summary-row total">
                         <span>TOTAL:</span>
                         <span>$${totalPay.toFixed(2)}</span>
@@ -691,6 +755,7 @@
             });
             document.getElementById('weekLabel').value = '';
             document.getElementById('startDate').value = '';
+            document.getElementById('holidayHours').value = '0';
             document.getElementById('results').classList.remove('show');
             weekDates = [];
 
